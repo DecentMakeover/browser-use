@@ -1,0 +1,9 @@
+langchain_openai
+langchain_anthropic
+uvicorn
+fastapi
+google-generativeai
+python-dotenv
+pillow
+playwright
+python-multipart
