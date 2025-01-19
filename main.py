@@ -2,28 +2,25 @@
 # Combined single file
 ############################
 
+import json
 # --------------------------
 # All necessary imports
 # --------------------------
 import os
-import json
 import tempfile
-import asyncio
-from typing import List, Dict, Any
-from pydantic import BaseModel
-from fastapi import FastAPI, HTTPException, UploadFile, Form
-from fastapi.middleware.cors import CORSMiddleware
+from typing import List
 
 # Google Generative AI
 import google.generativeai as genai
+from fastapi import FastAPI, HTTPException, UploadFile, Form
+from fastapi.middleware.cors import CORSMiddleware
 from google.ai.generativelanguage_v1beta.types import content
-
 # LangChain / Browser Agent
 from langchain_openai import ChatOpenAI
+from pydantic import BaseModel
+
 from browser_use import Agent
-from browser_use.browser.browser import Browser, BrowserConfig, BrowserContextConfig
-
-
+from browser_use.browser.browser import Browser, BrowserConfig
 
 # --------------------------
 # Create one FastAPI instance
@@ -41,6 +38,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # --------------------------
 # 1) Endpoint: run-test
 # --------------------------
@@ -48,15 +46,18 @@ app.add_middleware(
 class TestStep(BaseModel):
     description: str  # Description of the test step
 
+
 class TaskRequest(BaseModel):
-    url: str           # The URL to open
+    url: str  # The URL to open
     credentials: dict  # Credentials (optional)
     test_steps: List[TestStep]  # List of test steps
+
 
 # Initialize the browser for the Agent
 browser = Browser(
     config=BrowserConfig(headless=True),
 )
+
 
 @app.post("/run-test")
 async def run_test(request: TaskRequest):
@@ -77,7 +78,7 @@ async def run_test(request: TaskRequest):
             current_task += f"{idx}. {step.description}\n"
 
         print("Generated Task:\n", current_task)
-        
+
         # Create and run the agent
         agent = Agent(
             task=current_task,
@@ -85,21 +86,16 @@ async def run_test(request: TaskRequest):
             browser=browser
         )
         result = await agent.run()
-        
+
         return {"status": "success", "result": result}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 # --------------------------
 # 2) Endpoint: generate-scenarios
 # --------------------------
-
-# Configure the API key for Generative AI
-my_api_key = "AIzaSyDD8yMn5N5VxOLa1Xy3zcgvk2qKCPr-GpA"
-genai.configure(api_key=my_api_key)
-
-os.environ["GOOGLE_API_KEY"] = my_api_key
 
 # Define prompt and generation config
 scenarios_prompt = """You are a world-class tester. 
@@ -151,6 +147,7 @@ model_scenarios = genai.GenerativeModel(
     system_instruction=scenarios_prompt
 )
 
+
 @app.post("/generate-scenarios/")
 async def upload_pdf(file: UploadFile, mime_type: str = Form("application/pdf")):
     """
@@ -176,6 +173,7 @@ async def upload_pdf(file: UploadFile, mime_type: str = Form("application/pdf"))
         raise HTTPException(status_code=400, detail=f"Invalid JSON format: {e}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing file: {e}")
+
 
 # --------------------------
 # 3) Endpoint: generate-test-cases
@@ -265,11 +263,12 @@ model_testcases = genai.GenerativeModel(
     system_instruction=test_case_prompt_template,
 )
 
+
 @app.post("/generate-test-cases/")
 async def upload_pdf_with_scenarios(
-    file: UploadFile,
-    scenarios: List[str] = Form(...),
-    mime_type: str = Form("application/pdf")
+        file: UploadFile,
+        scenarios: List[str] = Form(...),
+        mime_type: str = Form("application/pdf")
 ):
     """
     Endpoint to upload a PDF file and generate test cases for given scenarios.
