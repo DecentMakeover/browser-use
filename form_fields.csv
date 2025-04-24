@@ -1,0 +1,74 @@
+Field Name,Description
+Examiner Prefix,Form Header / Certification
+Remitter Prefix 1,Prefix for remitter
+Remitter Name 1,Name of remitter
+Remitter PAN TAN,PAN/TAN of remitter
+Beneficiary Prefix,Prefix for beneficiary
+Beneficiary Name Header,Name of beneficiary
+Beneficiary Name,Name of beneficiary
+Beneficiary Flat Door Building,Flat/Door/Building number
+Beneficiary Premises Building Village,Premises/Building/Village
+Beneficiary Road Street,Road/Street
+Beneficiary Area Locality,Area/Locality
+Beneficiary Town City District,Town/City/District
+Beneficiary State,State
+Beneficiary Country,Country
+Beneficiary ZIP Code,ZIP Code
+Remittance Country,Country of remittance
+Remittance Currency,Currency of remittance
+Amount Payable Foreign Currency,Amount in foreign currency
+Amount Payable Indian Rs,Amount in Indian Rupees
+Bank Name,Name of bank
+Bank Branch Name,Branch name
+Bank BSR Code,BSR Code (7 digits)
+Proposed Remittance Date,Date of proposed remittance
+Nature of Remittance Agreement,Nature of agreement
+RBI Purpose Code Category,Purpose code category
+RBI Purpose Code Specific,Specific purpose code
+Grossed Up Flag,Grossed up status
+Taxability India Flag,Taxability in India
+Taxability India Reason Not Taxable,Reason if not taxable
+Taxability India Section,Section under Income Tax Act
+Taxability India Chargeable Amount,Chargeable amount
+Taxability India Tax Liability,Tax liability
+Taxability India Basis,Basis of taxability
+DTAA Relief Claimed Flag,DTAA relief claimed
+DTAA TRC Obtained Flag,TRC obtained
+DTAA Relevant Treaty,Relevant treaty
+DTAA Relevant Article,Relevant article
+DTAA Taxable Income,Taxable income under DTAA
+DTAA Tax Liability,Tax liability under DTAA
+DTAA Royalties FTS Flag,Royalties/FTS status
+DTAA Royalties FTS Article,Article for royalties/FTS
+DTAA Royalties FTS TDS Rate,TDS rate for royalties/FTS
+DTAA Business Income Flag,Business income status
+DTAA Business Income Taxable India Flag,Taxable in India status
+DTAA Business Income Tax Rate Basis,Tax rate basis
+DTAA Business Income Not Taxable Reason,Reason if not taxable
+DTAA Capital Gains Flag,Capital gains status
+DTAA Capital Gains LTCG Amount,LTCG amount
+DTAA Capital Gains STCG Amount,STCG amount
+DTAA Capital Gains Basis,Basis for capital gains
+DTAA Other Remittance Flag,Other remittance status
+DTAA Other Remittance Nature,Nature of other remittance
+DTAA Other Remittance Taxable Flag,Taxable status
+DTAA Other Remittance TDS Rate,TDS rate
+DTAA Other Remittance Not Taxable Reason,Reason if not taxable
+TDS Amount Foreign Currency,TDS amount in foreign currency
+TDS Amount Indian Rs,TDS amount in Indian Rupees
+TDS Rate Basis,Basis of TDS rate
+TDS Rate Value,TDS rate value
+Actual Remittance After TDS Foreign Currency,Actual remittance after TDS
+TDS Deduction Date,Date of TDS deduction
+Accountant Name,Name of accountant
+Accountant Firm Name,Firm name
+Accountant Address Line1,Address line 1
+Accountant Address Premises Building Village,Premises/Building/Village
+Accountant Address Road Street,Road/Street
+Accountant Address Area Locality,Area/Locality
+Accountant Address Town City District,Town/City/District
+Accountant Address Type,Address type
+Accountant Address Country,Country
+Accountant Address ZIP Code,ZIP Code
+Accountant Membership No,Membership number
+Accountant Registration No,Registration number 

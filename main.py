@@ -2,18 +2,26 @@
 # Combined single file
 ############################
 
+import csv
+import datetime
+import importlib.util
 import json
+import os
+import shutil
+import tempfile
+import uuid
+from pathlib import Path
 # --------------------------
 # All necessary imports
 # --------------------------
-import os
-import tempfile
 from typing import List
 
 # Google Generative AI
 import google.generativeai as genai
-from fastapi import FastAPI, HTTPException, UploadFile, Form
+from fastapi import FastAPI, Form
+from fastapi import UploadFile, File, HTTPException, BackgroundTasks, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
 from google.ai.generativelanguage_v1beta.types import content
 # LangChain / Browser Agent
 from langchain_openai import ChatOpenAI
@@ -21,6 +29,7 @@ from pydantic import BaseModel
 
 from browser_use import Agent
 from browser_use.browser.browser import Browser, BrowserConfig
+from validation import validate_csv_data
 
 # --------------------------
 # Create one FastAPI instance
@@ -309,8 +318,225 @@ async def upload_pdf_with_scenarios(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing file or generating test cases: {e}")
 
+
 # --------------------------
 # That's it! Now you have:
 # - A single FastAPI app
 # - All three endpoints /run-test, /generate-scenarios, /generate-test-cases
 # --------------------------
+
+
+# Create output directory if it doesn't exist
+OUTPUT_DIR = Path("output")
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+# Check if conversion module exists
+if os.path.exists("csv_to_xml.py"):
+    # Import the csv_to_xml module dynamically
+    spec = importlib.util.spec_from_file_location("csv_to_xml", "csv_to_xml.py")
+    csv_to_xml = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(csv_to_xml)
+else:
+    raise ImportError("csv_to_xml.py module not found in the current directory")
+
+
+@app.post("/convert/", response_class=FileResponse)
+async def convert_csv_to_xml(
+        file: UploadFile = File(...),
+        background_tasks: BackgroundTasks = None,
+        skip_validation: bool = Query(False, description="Skip data validation")
+):
+    # Validate file type
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(status_code=400, detail="Only CSV files are supported")
+
+    try:
+        # Generate a unique filename based on timestamp and UUID
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        unique_id = str(uuid.uuid4())[:8]
+        original_filename = file.filename.replace('.csv', '')
+        output_filename = f"{original_filename}_{timestamp}_{unique_id}.xml"
+
+        # Create a temporary directory to work with
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_dir_path = Path(temp_dir)
+            # Save the uploaded file to temp directory
+            temp_csv_path = temp_dir_path / "original_upload.csv"
+            with open(temp_csv_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+
+            # Process the uploaded file which should be in form_fields_with_data.csv format
+            # into the data_for_conversion.csv format (single row with headers as column names)
+            try:
+                with open(temp_csv_path, 'r', newline='') as input_file:
+                    csv_reader = csv.reader(input_file)
+                    # First row should contain "Field Name,Value"
+                    header = next(csv_reader)
+
+                    if len(header) != 2 or header[0].strip() != "Field Name" or header[1].strip() != "Value":
+                        raise ValueError("CSV file must have 'Field Name' and 'Value' columns")
+
+                    # Read the field names and values
+                    field_names = []
+                    values = []
+                    for row in csv_reader:
+                        if len(row) >= 2:
+                            field_names.append(row[0])
+                            values.append(row[1])
+
+                # Create the data_for_conversion.csv file with the correct format
+                data_file_path = temp_dir_path / "data_for_conversion.csv"
+                with open(data_file_path, 'w', newline='') as output_file:
+                    # Write field names as the header row
+                    csv_writer = csv.writer(output_file)
+                    csv_writer.writerow(field_names)
+                    # Write values as the data row
+                    csv_writer.writerow(values)
+
+                print("✓ CSV reformatted successfully")
+            except Exception as e:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Failed to process CSV file: {str(e)}"
+                )
+
+            # Copy all necessary files to temp directory
+            original_dir = os.getcwd()
+
+            # Copy only local files from the current directory
+            files_to_copy = ["csv_to_xml.py", "code_mappings.py", "validation.py"]
+            for file_name in files_to_copy:
+                if os.path.exists(file_name):
+                    shutil.copy(file_name, temp_dir_path / file_name)
+                else:
+                    # Skip validation.py if not found and validation is skipped
+                    if file_name == "validation.py" and skip_validation:
+                        continue
+                    else:
+                        raise HTTPException(
+                            status_code=500,
+                            detail=f"Required file {file_name} not found in the current directory"
+                        )
+
+            # Change to temp directory for processing
+            os.chdir(temp_dir)
+
+            # Validate data if required
+            if not skip_validation:
+                try:
+                    print("Validating CSV data before conversion...")
+
+                    # Import validation here to ensure we get the local version
+                    from validation import validate_csv_data
+
+                    validation_errors = validate_csv_data(str(data_file_path))
+
+                    if validation_errors:
+                        error_message = "Validation failed with the following errors:\n"
+                        for row, errors in validation_errors.items():
+                            error_message += f"\n{row}:\n"
+                            for field, error in errors.items():
+                                error_message += f"  - {field}: {error}\n"
+
+                        print(f"Validation failed: {error_message}")
+                        os.chdir(original_dir)
+                        return JSONResponse(
+                            status_code=400,
+                            content={
+                                "status": "error",
+                                "detail": "Validation failed",
+                                "validation_errors": validation_errors
+                            }
+                        )
+
+                    print("✓ Validation passed successfully")
+                except Exception as e:
+                    os.chdir(original_dir)
+                    raise HTTPException(status_code=500, detail=f"Error during validation: {str(e)}")
+
+            # Now execute the XML creation function
+            try:
+                # This will use data_for_conversion.csv to create output.xml
+                csv_to_xml.create_xml()
+                print("✓ XML file created successfully")
+            except Exception as e:
+                os.chdir(original_dir)
+                raise HTTPException(status_code=500, detail=f"Error in XML generation: {str(e)}")
+
+            # Check if XML was created
+            xml_path = Path(temp_dir) / "output.xml"
+            if not xml_path.exists():
+                os.chdir(original_dir)
+                raise HTTPException(status_code=500, detail="Failed to generate XML file")
+
+            # Go back to original directory
+            os.chdir(original_dir)
+
+            # Save a copy to the output directory
+            output_file_path = OUTPUT_DIR / output_filename
+            shutil.copy(xml_path, output_file_path)
+            print(f"XML saved to {output_file_path}")
+
+            # Copy the output file to a location where it's accessible for the response
+            temp_output_path = Path("temp_output.xml")
+            shutil.copy(xml_path, temp_output_path)
+
+            # Return the XML file
+            temp_output_path_str = str(temp_output_path)
+            if background_tasks:
+                background_tasks.add_task(os.remove, temp_output_path_str)
+
+            return FileResponse(
+                path=temp_output_path,
+                filename=output_filename,
+                media_type="application/xml"
+            )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error during conversion: {str(e)}")
+
+
+@app.get("/outputs/")
+async def list_outputs():
+    """List all XML files in the output directory"""
+    files = [f.name for f in OUTPUT_DIR.glob("*.xml")]
+    return {"files": files, "count": len(files)}
+
+
+@app.post("/validate-csv/")
+async def validate_csv(file: UploadFile = File(...)):
+    """
+    Validate CSV data without conversion to XML.
+    This endpoint can be used to check if the data is valid before proceeding with conversion.
+    """
+    # Validate file type
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(status_code=400, detail="Only CSV files are supported")
+
+    try:
+        # Create a temporary directory
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_dir_path = Path(temp_dir)
+
+            # Save the uploaded file
+            csv_path = temp_dir_path / "data_to_validate.csv"
+            with open(csv_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+
+            # Run validation
+            validation_errors = validate_csv_data(str(csv_path))
+
+            if validation_errors:
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "status": "error",
+                        "detail": "Validation failed",
+                        "validation_errors": validation_errors
+                    }
+                )
+            else:
+                return {"status": "success", "message": "CSV data is valid"}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error during validation: {str(e)}")
